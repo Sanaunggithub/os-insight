@@ -1,0 +1,13 @@
+# Exclude Git metadata from the worker's repository-root build context.
+.git/
+# Exclude Python bytecode generated during local runs.
+**/__pycache__/
+**/*.py[cod]
+# Exclude local Python environments because the image installs its own dependencies.
+**/.venv/
+**/venv/
+# Exclude web dependencies and generated output; the worker does not need them.
+web/node_modules/
+web/.next/
+# Exclude local environment files so credentials are not copied into the worker image.
+.env*

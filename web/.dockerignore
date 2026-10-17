@@ -1,3 +1,10 @@
+# Keep local npm installs out of the Docker build context.
 node_modules
+# Keep locally generated Next.js output out of the Docker build context.
 .next
+# Exclude npm debug logs that are not needed to build the dashboard.
 npm-debug.log
+# Exclude local environment files so credentials are not copied into the image.
+.env*
+# Exclude Git metadata to keep the build context small.
+.git

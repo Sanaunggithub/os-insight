@@ -1,0 +1,10 @@
+# Exclude Python bytecode because the API image compiles its own imports.
+__pycache__/
+*.py[cod]
+# Exclude local virtual environments because dependencies are installed from requirements.txt.
+.venv/
+venv/
+# Exclude local environment files so credentials are not copied into the image.
+.env*
+# Exclude Git metadata to keep the build context small.
+.git/
