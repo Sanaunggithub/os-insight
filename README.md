@@ -12,12 +12,19 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-The API is available at `http://localhost:8001` by default; PostgreSQL
-initializes its tables from `db/init.sql` when its data volume is first created.
-The worker waits for PostgreSQL to be healthy, then checks for jobs once per
-second and samples its metrics every two seconds. Its container is limited to
-0.5 CPU and 256 MiB of memory. To stop the services, run `docker compose down`;
-database data remains in the named volume.
+The dashboard is available at `http://localhost:3000` and the API at
+`http://localhost:8001` by default. The web container proxies browser requests
+to the API using the `API_BASE_URL` environment variable (`http://api:8000` on
+the Compose network). Set it in `.env` when using a different API address.
+PostgreSQL initializes its tables from `db/init.sql` when its data volume is
+first created. The worker waits for PostgreSQL to be healthy, then checks for
+jobs once per second and samples its metrics every two seconds. Its container
+is limited to 0.5 CPU and 256 MiB of memory. To stop the services, run
+`docker compose down`; database data remains in the named volume.
+
+The dashboard refreshes live container cards and recent job status every two
+seconds, plots API and worker CPU history, and displays operating-system and
+cgroup details.
 
 ## API endpoints
 

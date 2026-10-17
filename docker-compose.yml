@@ -70,6 +70,29 @@ services:
     networks:
       - os_insight_net
 
+  web:
+    build: ./web
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+    ports:
+      - "${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      api:
+        # The dashboard proxy targets the API container by service name.
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - os_insight_net
+
 volumes:
   postgres_data:
 
