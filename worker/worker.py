@@ -21,7 +21,13 @@ logger = logging.getLogger("os-insight-worker")
 POLL_INTERVAL_S = 1
 SAMPLE_INTERVAL_S = 2
 MEMORY_RESERVE_BYTES = 48 * 1024 * 1024
+HEARTBEAT_PATH = "/tmp/worker-heartbeat"
 shutdown_event = threading.Event()
+
+
+def _touch_heartbeat() -> None:
+    with open(HEARTBEAT_PATH, "w") as heartbeat:
+        heartbeat.write("ok\n")
 
 
 def _database_conninfo() -> str:
@@ -44,6 +50,7 @@ def _handle_shutdown(signum: int, _frame: object) -> None:
 
 def _sample_metrics(pool: ConnectionPool, collector: MetricsCollector) -> None:
     while not shutdown_event.is_set():
+        _touch_heartbeat()
         try:
             sample = collector.collect()
             with pool.connection() as connection:
@@ -262,6 +269,7 @@ def main() -> None:
     sampler.start()
     try:
         while not shutdown_event.is_set():
+            _touch_heartbeat()
             try:
                 job = _claim_job(pool)
             except (psycopg.Error, PoolTimeout):

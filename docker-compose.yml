@@ -1,4 +1,5 @@
 services:
+  # Keep PostgreSQL as the private, persistent data store for the application.
   db:
     image: postgres:16-alpine
     environment:
@@ -6,19 +7,23 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-os_insight}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
+      # Keep database records across container replacements.
       - postgres_data:/var/lib/postgresql/data
-      # PostgreSQL runs init scripts only when creating a new data directory.
+      # Set up the schema when PostgreSQL first creates its data directory.
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     networks:
-      # Keep database and application traffic on a project-local bridge.
+      # Let project services reach PostgreSQL without exposing it on the host.
       - os_insight_net
     healthcheck:
+      # Report healthy only when PostgreSQL accepts connections to this database.
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 3s
       retries: 5
+    # Restart the database automatically after a crash or host restart.
     restart: unless-stopped
 
+  # Serve API requests and collect application data from the private database.
   api:
     build: ./api
     environment:
@@ -28,12 +33,14 @@ services:
       POSTGRES_HOST: db
       SERVICE_NAME: api
     ports:
+      # Publish the API on a configurable host port for local access.
       - "${API_HOST_PORT:-8001}:8000"
     depends_on:
       db:
-        # Start the API only after PostgreSQL can accept connections.
+        # Wait for PostgreSQL to accept connections before starting the API.
         condition: service_healthy
     healthcheck:
+      # Check the API health endpoint so dependent services wait for a ready API.
       test:
         - CMD
         - python
@@ -42,15 +49,18 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    # Restart the API automatically after a crash or host restart.
     restart: unless-stopped
-    # Bound the monitored service so its own resource usage remains controlled.
-    cpus: 1.0
-    mem_limit: 512m
     networks:
+      # Keep API-to-database traffic on the project-only bridge network.
       - os_insight_net
+    # Reserve a one-CPU ceiling so API monitoring stays within its budget.
+    cpus: 1.0
+    # Cap API memory so monitoring cannot consume all host memory.
+    mem_limit: 512m
 
+  # Run queued stress-test jobs without exposing a host port.
   worker:
-    # Build from the repository root so the worker can reuse api/metrics.py.
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -61,26 +71,42 @@ services:
       POSTGRES_HOST: db
     depends_on:
       db:
-        # The worker queries jobs as soon as it starts, so wait for PostgreSQL.
+        # Wait for PostgreSQL to accept connections before claiming jobs.
         condition: service_healthy
+    healthcheck:
+      # Treat a heartbeat no older than twenty seconds as a live worker loop.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, sys, time; path = '/tmp/worker-heartbeat'; sys.exit(0 if os.path.exists(path) and time.time() - os.path.getmtime(path) <= 20 else 1)"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    # Restart the worker automatically after a crash or host restart.
     restart: unless-stopped
-    # Keep stress tests within the resource budget assigned to the worker.
-    cpus: 0.5
-    mem_limit: 256m
     networks:
+      # Let the worker reach PostgreSQL on the private project network.
       - os_insight_net
+    # Limit worker CPU use so stress jobs leave capacity for other services.
+    cpus: 0.5
+    # Cap worker memory to keep stress jobs inside their assigned budget.
+    mem_limit: 256m
 
+  # Show the dashboard and proxy its server-side API requests.
   web:
     build: ./web
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api:8000}
     ports:
+      # Publish the dashboard on a configurable host port for local access.
       - "${WEB_HOST_PORT:-3000}:3000"
     depends_on:
       api:
-        # The dashboard proxy targets the API container by service name.
+        # Wait until the API is ready before serving dashboard requests.
         condition: service_healthy
     healthcheck:
+      # Use Node's built-in fetch to check that the dashboard responds.
       test:
         - CMD
         - node
@@ -89,13 +115,17 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    # Restart the web application automatically after a crash or host restart.
     restart: unless-stopped
     networks:
+      # Keep web-to-API traffic on the project-only bridge network.
       - os_insight_net
 
 volumes:
+  # Store PostgreSQL data independently from replaceable containers.
   postgres_data:
 
 networks:
+  # Give the project services a private bridge for service-name communication.
   os_insight_net:
     driver: bridge
