@@ -9,31 +9,29 @@ OS Insight is a multi-tier web application for observing operating-system resour
 ```text
                          Browser
                             |
-             WEB_HOST_PORT (default 3000)
-                            v
-                    +---------------+
-                    | web :3000     |
-                    | Next.js UI    |
-                    +-------+-------+
-                            | server-side proxy
-                            | API_BASE_URL=http://api:8000
-                            v
-             API_HOST_PORT (default 8001)
-                    +---------------+
-                    | api :8000     |
-                    | FastAPI       |
-                    +---+-------+---+
-                        |       |
-           HTTP/SQL     |       | SQL / job polling
-                        v       v
-                   +--------+  +---------------+
-                   | db     |  | worker        |
-                   |        |  | no host port  |
-                   +---+----+  +---------------+
-                       |
-                       v
-                 postgres_data
-                 named volume
+              WEB_HOST_PORT (default 3000)
+                         |
+                         v
+                 +---------------+
+                 | web :3000     |
+                 | Next.js UI    |
+                 +-------+-------+
+                         | server-side proxy
+                         | API_BASE_URL=http://api:8000
+                         v
+API_HOST_PORT      +---------------+       +---------------+
+(default 8001) --->| api :8000     |       | worker        |
+                   | FastAPI       |       | no host port  |
+                   +-------+-------+       +-------+-------+
+                           | SQL                   | SQL
+                           v                       v
+                   +-------------------------------------+
+                   | db :5432 (not host-published)       |
+                   +------------------+------------------+
+                                      |
+                                      v
+                                postgres_data
+                                named volume
 
        All four containers join os_insight_net (bridge network).
        Only web and api publish host ports.
@@ -68,8 +66,6 @@ The web container reaches the API by its Compose service name, `api`, rather tha
 │   └── requirements.txt          # API Python dependencies
 ├── db/
 │   └── init.sql                  # Creates metrics and stress-job tables on first DB start
-├── docs/
-│   └── AI_USAGE.md               # AI assistance disclosure
 ├── web/
 │   ├── .dockerignore             # Excludes local web dependencies and generated files
 │   ├── .gitignore                # Excludes local Next.js and TypeScript output
@@ -255,7 +251,7 @@ docker compose down -v
 |---|---|
 | Each service runs in its own container; API and web processes run as PID 1 in their containers | Process isolation and PID namespaces |
 | The worker starts child processes for CPU stress jobs | Processes and process creation |
-| The API and worker have background metric-sampling threads | Threads and concurrent execution |
+| The API samples metrics in an asyncio background task, while the worker samples metrics in a background thread | Asynchronous tasks, threads, and concurrent execution |
 | The worker's `cpus: 0.5` limit controls CPU time shared by its workload | CPU scheduling and the cgroup CFS quota |
 | The worker's `mem_limit: 256m` limit and opt-in OOM demo constrain memory | Memory limits, cgroups, and the kernel OOM killer |
 | Containers isolate process IDs and resource accounting | Namespaces and cgroups |
@@ -263,7 +259,3 @@ docker compose down -v
 | Services communicate over the Compose bridge using service names such as `api` and `db` | Bridge networking and service-name DNS |
 | Containers receive termination signals and shut down their application processes | Signals and graceful shutdown |
 | The dashboard/API use HTTP, while the API and worker read and write PostgreSQL records | Inter-process communication via HTTP and a database |
-
-## 14. Use of AI
-
-AI assistance was used to help review the project and prepare its documentation; the resulting descriptions were checked against the repository configuration and source. See [docs/AI_USAGE.md](./docs/AI_USAGE.md) for the disclosure.
