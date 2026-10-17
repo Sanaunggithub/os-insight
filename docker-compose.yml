@@ -28,7 +28,7 @@ services:
       POSTGRES_HOST: db
       SERVICE_NAME: api
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8001}:8000"
     depends_on:
       db:
         # Start the API only after PostgreSQL can accept connections.
@@ -46,6 +46,27 @@ services:
     # Bound the monitored service so its own resource usage remains controlled.
     cpus: 1.0
     mem_limit: 512m
+    networks:
+      - os_insight_net
+
+  worker:
+    # Build from the repository root so the worker can reuse api/metrics.py.
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-os_insight}
+      POSTGRES_USER: ${POSTGRES_USER:-os_insight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        # The worker queries jobs as soon as it starts, so wait for PostgreSQL.
+        condition: service_healthy
+    restart: unless-stopped
+    # Keep stress tests within the resource budget assigned to the worker.
+    cpus: 0.5
+    mem_limit: 256m
     networks:
       - os_insight_net
 

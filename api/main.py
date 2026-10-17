@@ -75,16 +75,6 @@ async def lifespan(app: FastAPI):
     )
     try:
         pool.open(wait=True, timeout=10)
-        with pool.connection() as connection:
-            # Existing named volumes do not rerun db/init.sql, so add its newer
-            # optional job fields in place while preserving all existing rows.
-            connection.execute(
-                """
-                ALTER TABLE stress_jobs
-                    ADD COLUMN IF NOT EXISTS oom_demo BOOLEAN NOT NULL DEFAULT false,
-                    ADD COLUMN IF NOT EXISTS error_message TEXT
-                """
-            )
     except (psycopg.Error, PoolTimeout):
         pool.close()
         raise
