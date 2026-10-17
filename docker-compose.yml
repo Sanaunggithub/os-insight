@@ -9,6 +9,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
       # PostgreSQL runs init scripts only when creating a new data directory.
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      # Keep database and application traffic on a project-local bridge.
+      - os_insight_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -16,6 +19,39 @@ services:
       retries: 5
     restart: unless-stopped
 
+  api:
+    build: ./api
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-os_insight}
+      POSTGRES_USER: ${POSTGRES_USER:-os_insight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_HOST: db
+      SERVICE_NAME: api
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        # Start the API only after PostgreSQL can accept connections.
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    # Bound the monitored service so its own resource usage remains controlled.
+    cpus: 1.0
+    mem_limit: 512m
+    networks:
+      - os_insight_net
+
 volumes:
   postgres_data:
 
+networks:
+  os_insight_net:
+    driver: bridge

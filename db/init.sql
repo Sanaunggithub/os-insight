@@ -19,7 +19,9 @@ CREATE TABLE stress_jobs (
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'running', 'done', 'failed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at TIMESTAMPTZ
+    finished_at TIMESTAMPTZ,
+    oom_demo BOOLEAN NOT NULL DEFAULT false,
+    error_message TEXT
 );
 
 CREATE INDEX stress_jobs_status_created_at_idx
