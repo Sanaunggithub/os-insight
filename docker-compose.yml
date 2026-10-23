@@ -92,7 +92,9 @@ services:
     cpus: 0.5
     # Cap worker memory to keep stress jobs inside their assigned budget.
     mem_limit: 256m
-
+    # Same value as mem_limit means zero swap, so exceeding it triggers the kernel OOM killer.
+    memswap_limit: 256m
+    
   # Show the dashboard and proxy its server-side API requests.
   web:
     build: ./web
